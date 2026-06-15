@@ -88,3 +88,15 @@ build.sh · install.sh · install-login-item.sh · uninstall.sh · Info.plist ·
 
 No `$`-cost history, notifications, or multi-account. See `DESIGN.md` for the full design + verified
 endpoint/field facts.
+
+## Official signed build
+
+Maintainers: [RELEASE.md](RELEASE.md) builds a signed + notarized `ClaudeUsageBar.dmg` (Developer ID)
+that opens with no Gatekeeper warning. Once published, end users can grab it from **Releases**
+instead of building from source.
+
+## Disclaimer
+
+Unofficial — **not affiliated with or endorsed by Anthropic**. "Claude" is a trademark of Anthropic.
+This tool reads your own usage via an undocumented endpoint and may break without notice; use at your
+own risk.
