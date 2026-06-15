@@ -21,8 +21,8 @@ Week (all models), Week (Opus), Week (Sonnet), each with a bar; plus pay-as-you-
 ## Install — from source (recommended)
 
 ```sh
-# 1. Get the code (clone the repo, or download + unzip the folder), then cd into it
-cd ClaudeUsageBar
+# 1. Get the code
+git clone https://github.com/tibor-order/claude-usage-bar && cd claude-usage-bar
 
 # 2. Build + guided setup (checks toolchain, compiles, tells you the token step)
 ./install.sh
