@@ -1,0 +1,6 @@
+# Build output (rebuilt via ./build.sh)
+ClaudeUsageBar.app/
+*.o
+*.swiftmodule
+
+.DS_Store
