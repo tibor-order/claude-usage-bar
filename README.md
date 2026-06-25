@@ -3,8 +3,9 @@
 Native macOS menu-bar app showing live Claude **subscription** usage — the same numbers as
 Claude Code's `/usage`. Headline `%` + reset countdown in the menu bar; full breakdown on click.
 
-Menu bar shows e.g. `🟢 14% · 9h` (most-constrained meter + its reset). Click → Session (5h),
-Week (all models), Week (Opus), Week (Sonnet), each with a bar; plus pay-as-you-go `extra_usage`.
+Menu bar shows e.g. `🟡 62% · 4d` — the meter **you pick** (default: Week / all models) + its reset.
+Click → all meters with bars + `extra_usage`, plus a **Settings…** window (Menu Bar / Meters / Alerts
+tabs) to choose what shows where, and **high-usage notifications** (default: alert at 90%).
 
 ---
 

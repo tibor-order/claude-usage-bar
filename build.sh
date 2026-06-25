@@ -15,7 +15,7 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp Info.plist "$APP/Contents/Info.plist"
 
 OUT="$APP/Contents/MacOS/$BIN"
-COMMON=(-O -parse-as-library -sdk "$SDK" -framework SwiftUI -framework AppKit -framework Security Sources/*.swift)
+COMMON=(-O -parse-as-library -sdk "$SDK" -framework SwiftUI -framework AppKit -framework Security -framework UserNotifications Sources/*.swift)
 
 if [ "${1:-}" = "--universal" ]; then
   echo "Compiling universal (arm64 + x86_64)…"

@@ -1,7 +1,8 @@
 import Foundation
 import SwiftUI
 
-/// Observable state for the menu bar: polls UsageClient and exposes display-ready values.
+/// Observable state for the menu bar: polls UsageClient, exposes display-ready rows,
+/// and triggers threshold notifications.
 @MainActor
 final class UsageModel: ObservableObject {
     @Published private(set) var usage: Usage?
@@ -15,6 +16,7 @@ final class UsageModel: ObservableObject {
     func start() {
         guard !started else { return }
         started = true
+        Notifier.requestAuth()
         Task { await refresh() }
         timer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
             Task { await self?.refresh() }
@@ -23,9 +25,11 @@ final class UsageModel: ObservableObject {
 
     func refresh() async {
         do {
-            usage = try await UsageClient.fetch()
+            let u = try await UsageClient.fetch()
+            usage = u
             lastError = nil
             lastUpdated = Date()
+            Notifier.evaluate(u)
         } catch {
             lastError = Self.describe(error)
         }
@@ -43,27 +47,30 @@ final class UsageModel: ObservableObject {
     // MARK: - Display
 
     struct Row: Identifiable {
-        let name: String
+        let key: MeterKey
         let pct: Double
         let reset: Date?
-        var id: String { name }
+        var id: String { key.rawValue }
+        var name: String { key.displayName }
     }
 
-    var rows: [Row] {
-        guard let u = usage else { return [] }
-        var out: [Row] = []
-        func add(_ name: String, _ m: Meter?) {
-            if let m, let p = m.utilization { out.append(Row(name: name, pct: p, reset: m.resetDate)) }
-        }
-        add("Session (5h)", u.fiveHour)
-        add("Week (all models)", u.sevenDay)
-        add("Week (Opus)", u.sevenDayOpus)
-        add("Week (Sonnet)", u.sevenDaySonnet)
-        return out
+    func row(for key: MeterKey) -> Row? {
+        guard let u = usage, let m = key.meter(u), let p = m.utilization else { return nil }
+        return Row(key: key, pct: p, reset: m.resetDate)
     }
 
-    /// Most-constrained meter drives the menu-bar headline.
-    var headline: Row? { rows.max(by: { $0.pct < $1.pct }) }
+    /// Meters that currently have data, in a stable order.
+    var rows: [Row] { MeterKey.allCases.compactMap { row(for: $0) } }
+
+    var mostConstrained: Row? { rows.max { $0.pct < $1.pct } }
+
+    /// The row to show in the menu bar, per the user's headline choice.
+    func headlineRow(_ choice: String) -> Row? {
+        guard usage != nil else { return nil }
+        if choice == "mostConstrained" { return mostConstrained }
+        if let key = MeterKey(rawValue: choice), let r = row(for: key) { return r }
+        return mostConstrained ?? rows.first   // chosen meter is null right now → graceful fallback
+    }
 
     var extraUsageText: String? {
         guard let e = usage?.extraUsage, e.isEnabled == true, let limit = e.monthlyLimit else { return nil }
@@ -72,19 +79,14 @@ final class UsageModel: ObservableObject {
         return "Extra usage: \(Int(used)) / \(Int(limit)) \(cur)"
     }
 
-    var labelText: String {
-        if let err = lastError, usage == nil { return "⚠︎ \(err)" }
-        guard let h = headline else { return "…" }
-        return "\(Self.dot(h.pct)) \(Int(h.pct.rounded()))%\(Self.resetSuffix(h.reset))"
-    }
-
     static func dot(_ p: Double) -> String { p >= 80 ? "🔴" : (p >= 50 ? "🟡" : "🟢") }
 
-    static func resetSuffix(_ d: Date?) -> String {
-        guard let s = d?.timeIntervalSinceNow, s > 0 else { return "" }
+    /// Compact "in Xh / Yd / Zm", or nil if no/elapsed reset.
+    static func shortDuration(_ d: Date?) -> String? {
+        guard let s = d?.timeIntervalSinceNow, s > 0 else { return nil }
         let h = Int(s) / 3600
-        if h >= 48 { return " · \(h / 24)d" }
-        if h >= 1 { return " · \(h)h" }
-        return " · \(Int(s) / 60)m"
+        if h >= 48 { return "\(h / 24)d" }
+        if h >= 1 { return "\(h)h" }
+        return "\(Int(s) / 60)m"
     }
 }
