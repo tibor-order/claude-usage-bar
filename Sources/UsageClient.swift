@@ -2,6 +2,7 @@ import Foundation
 
 enum UsageError: Error {
     case noToken
+    case rateLimited(TimeInterval?)   // 429; associated value = Retry-After seconds if provided
     case http(Int, String)
     case decode(Error)
 }
@@ -27,7 +28,12 @@ enum UsageClient {
         req.timeoutInterval = 15
 
         let (data, resp) = try await URLSession.shared.data(for: req)
-        let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
+        let http = resp as? HTTPURLResponse
+        let code = http?.statusCode ?? 0
+        if code == 429 {
+            let retryAfter = http?.value(forHTTPHeaderField: "Retry-After").flatMap { TimeInterval($0) }
+            throw UsageError.rateLimited(retryAfter)
+        }
         guard code == 200 else {
             throw UsageError.http(code, String(data: data, encoding: .utf8) ?? "")
         }

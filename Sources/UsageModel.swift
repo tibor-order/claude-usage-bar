@@ -1,8 +1,8 @@
 import Foundation
 import SwiftUI
 
-/// Observable state for the menu bar: polls UsageClient, exposes display-ready rows,
-/// and triggers threshold notifications.
+/// Observable state for the menu bar: polls UsageClient on an adaptive schedule, caches the
+/// last good result, and triggers threshold notifications.
 @MainActor
 final class UsageModel: ObservableObject {
     @Published private(set) var usage: Usage?
@@ -10,34 +10,79 @@ final class UsageModel: ObservableObject {
     @Published private(set) var lastUpdated: Date?
 
     private var timer: Timer?
-    private let interval: TimeInterval = 60
+    private let baseInterval: TimeInterval = 300        // 5 min when healthy
+    private var nextDelay: TimeInterval = 300
     private var started = false
+
+    private let cacheKey = "cachedUsage"
+    private let cacheAtKey = "cachedUsageAt"
+
+    init() {
+        // Restore last-good usage so a cold start (or a rate-limit) shows data immediately
+        // instead of an error.
+        if let data = UserDefaults.standard.data(forKey: cacheKey),
+           let cached = try? JSONDecoder().decode(Usage.self, from: data) {
+            usage = cached
+            lastUpdated = UserDefaults.standard.object(forKey: cacheAtKey) as? Date
+        }
+    }
 
     func start() {
         guard !started else { return }
         started = true
         Notifier.requestAuth()
-        Task { await refresh() }
-        timer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
-            Task { await self?.refresh() }
+        Task { await tick() }
+    }
+
+    /// Forced refresh from the UI; also reschedules the next automatic poll.
+    func refreshNow() async { await tick() }
+
+    private func tick() async {
+        await refresh()
+        scheduleNext(nextDelay)
+    }
+
+    private func scheduleNext(_ delay: TimeInterval) {
+        timer?.invalidate()
+        timer = Timer.scheduledTimer(withTimeInterval: delay, repeats: false) { [weak self] _ in
+            Task { await self?.tick() }
         }
     }
 
-    func refresh() async {
+    private func refresh() async {
         do {
             let u = try await UsageClient.fetch()
             usage = u
             lastError = nil
             lastUpdated = Date()
+            nextDelay = baseInterval                    // healthy → back to 5 min
+            persist(u)
             Notifier.evaluate(u)
         } catch {
             lastError = Self.describe(error)
+            nextDelay = Self.backoff(for: error, current: nextDelay, base: baseInterval)
+            // NOTE: usage is intentionally NOT cleared — keep showing the last good value.
         }
+    }
+
+    private func persist(_ u: Usage) {
+        guard let data = try? JSONEncoder().encode(u) else { return }
+        UserDefaults.standard.set(data, forKey: cacheKey)
+        UserDefaults.standard.set(Date(), forKey: cacheAtKey)
+    }
+
+    /// Honor Retry-After on 429; otherwise exponential backoff up to 30 min.
+    static func backoff(for error: Error, current: TimeInterval, base: TimeInterval) -> TimeInterval {
+        if case let UsageError.rateLimited(retryAfter) = error {
+            return min(max(retryAfter ?? current * 2, 120), 1800)
+        }
+        return min(max(current, 90), base)              // transient errors: retry within ~base
     }
 
     static func describe(_ error: Error) -> String {
         switch error {
         case UsageError.noToken: return "no token"
+        case UsageError.rateLimited: return "rate-limited"
         case let UsageError.http(code, _): return code == 401 ? "auth" : "http \(code)"
         case UsageError.decode: return "bad data"
         default: return "offline"
@@ -59,17 +104,15 @@ final class UsageModel: ObservableObject {
         return Row(key: key, pct: p, reset: m.resetDate)
     }
 
-    /// Meters that currently have data, in a stable order.
     var rows: [Row] { MeterKey.allCases.compactMap { row(for: $0) } }
 
     var mostConstrained: Row? { rows.max { $0.pct < $1.pct } }
 
-    /// The row to show in the menu bar, per the user's headline choice.
     func headlineRow(_ choice: String) -> Row? {
         guard usage != nil else { return nil }
         if choice == "mostConstrained" { return mostConstrained }
         if let key = MeterKey(rawValue: choice), let r = row(for: key) { return r }
-        return mostConstrained ?? rows.first   // chosen meter is null right now → graceful fallback
+        return mostConstrained ?? rows.first
     }
 
     struct SpendInfo {
@@ -99,7 +142,7 @@ final class UsageModel: ObservableObject {
 
     static func dot(_ p: Double) -> String { p >= 80 ? "🔴" : (p >= 50 ? "🟡" : "🟢") }
 
-    /// Compact "in Xh / Yd / Zm", or nil if no/elapsed reset.
+    /// Compact "Xh / Yd / Zm", or nil if no/elapsed reset.
     static func shortDuration(_ d: Date?) -> String? {
         guard let s = d?.timeIntervalSinceNow, s > 0 else { return nil }
         let h = Int(s) / 3600

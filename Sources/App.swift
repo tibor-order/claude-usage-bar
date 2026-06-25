@@ -75,7 +75,7 @@ struct PopoverView: View {
             Text("Claude Usage").font(.headline)
 
             if model.usage == nil {
-                Text(model.lastError.map { "Can't load usage: \($0)" } ?? "Loading…")
+                Text(emptyMessage)
                     .font(.callout).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                 if model.lastError == "no token" {
@@ -112,8 +112,11 @@ struct PopoverView: View {
             Divider()
             HStack {
                 Text(updatedText).font(.caption).foregroundStyle(.secondary)
+                if model.lastError != nil, model.usage != nil {
+                    Text("· retrying").font(.caption).foregroundStyle(.secondary)
+                }
                 Spacer()
-                Button("Refresh") { Task { await model.refresh() } }
+                Button("Refresh") { Task { await model.refreshNow() } }
             }
             HStack {
                 Button("Settings…") {
@@ -150,6 +153,15 @@ struct PopoverView: View {
                 Spacer()
                 Text("no usage").font(.caption).foregroundStyle(.tertiary)
             }
+        }
+    }
+
+    private var emptyMessage: String {
+        switch model.lastError {
+        case "rate-limited"?: return "Anthropic is rate-limiting requests — retrying automatically."
+        case "no token"?:     return "No token. See below."
+        case .some(let e):    return "Can't load usage: \(e)"
+        case nil:             return "Loading…"
         }
     }
 
