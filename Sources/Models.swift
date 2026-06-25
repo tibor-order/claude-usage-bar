@@ -27,13 +27,17 @@ struct ExtraUsage: Codable {
     let isEnabled: Bool?
     let monthlyLimit: Double?
     let usedCredits: Double?
+    let utilization: Double?
     let currency: String?
+    let disabledReason: String?
 
     enum CodingKeys: String, CodingKey {
         case isEnabled = "is_enabled"
         case monthlyLimit = "monthly_limit"
         case usedCredits = "used_credits"
+        case utilization
         case currency
+        case disabledReason = "disabled_reason"
     }
 }
 

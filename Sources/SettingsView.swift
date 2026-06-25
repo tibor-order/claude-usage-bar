@@ -50,7 +50,7 @@ private struct MetersTab: View {
                 Toggle(MeterKey.sevenDaySonnet.displayName, isOn: $sSonnet)
                 Toggle("Extra usage (overflow credits)", isOn: $sExtra)
             }
-            Text("Meters with no data right now are hidden automatically.")
+            Text("Enabled meters always appear; one with no usage this period shows as “no usage.”")
                 .font(.caption).foregroundStyle(.secondary)
         }
         .formStyle(.grouped)

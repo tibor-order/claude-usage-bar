@@ -72,11 +72,18 @@ final class UsageModel: ObservableObject {
         return mostConstrained ?? rows.first   // chosen meter is null right now → graceful fallback
     }
 
+    /// Shown whenever an overflow allowance exists — including when it's off/exhausted,
+    /// since that status is itself useful. nil only when there's no extra-usage block at all.
     var extraUsageText: String? {
-        guard let e = usage?.extraUsage, e.isEnabled == true, let limit = e.monthlyLimit else { return nil }
-        let used = e.usedCredits ?? 0
+        guard let e = usage?.extraUsage, let limit = e.monthlyLimit, limit > 0 else { return nil }
+        let used = Int((e.usedCredits ?? 0).rounded())
         let cur = e.currency ?? ""
-        return "Extra usage: \(Int(used)) / \(Int(limit)) \(cur)"
+        var s = "Extra usage: \(used)/\(Int(limit)) \(cur)"
+        if let u = e.utilization { s += " · \(Int(u.rounded()))%" }
+        if e.isEnabled != true {
+            s += e.disabledReason == "out_of_credits" ? " · out of credits" : " · off"
+        }
+        return s
     }
 
     static func dot(_ p: Double) -> String { p >= 80 ? "🔴" : (p >= 50 ? "🟡" : "🟢") }

@@ -70,11 +70,11 @@ struct PopoverView: View {
     }
 
     var body: some View {
-        let rows = model.rows.filter { visible($0.key) }
+        let enabled = MeterKey.allCases.filter { visible($0) }
         VStack(alignment: .leading, spacing: 10) {
             Text("Claude Usage").font(.headline)
 
-            if rows.isEmpty {
+            if model.usage == nil {
                 Text(model.lastError.map { "Can't load usage: \($0)" } ?? "Loading…")
                     .font(.callout).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -83,24 +83,14 @@ struct PopoverView: View {
                         .font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
                 }
             } else {
-                ForEach(rows) { row in
-                    VStack(alignment: .leading, spacing: 3) {
-                        HStack(spacing: 6) {
-                            Text(row.name)
-                            Spacer()
-                            Text("\(Int(row.pct.rounded()))%").monospacedDigit()
-                            if let dur = UsageModel.shortDuration(row.reset) {
-                                Text(dur).foregroundStyle(.secondary).font(.caption)
-                            }
-                        }
-                        ProgressView(value: min(row.pct, 100), total: 100).tint(tint(row.pct))
-                    }
+                if enabled.isEmpty {
+                    Text("No meters selected — open Settings ▸ Meters.")
+                        .font(.callout).foregroundStyle(.secondary)
                 }
-            }
-
-            if sExtra, let extra = model.extraUsageText {
-                Divider()
-                Text(extra).font(.caption).foregroundStyle(.secondary)
+                ForEach(enabled) { meterRow($0) }       // a toggled-on meter ALWAYS shows
+                if sExtra, let extra = model.extraUsageText {
+                    Text(extra).font(.caption).foregroundStyle(.secondary)
+                }
             }
 
             Divider()
@@ -120,6 +110,31 @@ struct PopoverView: View {
         }
         .padding(12)
         .frame(width: 300)
+    }
+
+    /// A meter with data → name + % + reset + bar. A meter with no data this window →
+    /// muted "no usage" so the row still corresponds to its toggle.
+    @ViewBuilder
+    private func meterRow(_ key: MeterKey) -> some View {
+        if let row = model.row(for: key) {
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 6) {
+                    Text(row.name)
+                    Spacer()
+                    Text("\(Int(row.pct.rounded()))%").monospacedDigit()
+                    if let dur = UsageModel.shortDuration(row.reset) {
+                        Text(dur).foregroundStyle(.secondary).font(.caption)
+                    }
+                }
+                ProgressView(value: min(row.pct, 100), total: 100).tint(tint(row.pct))
+            }
+        } else {
+            HStack {
+                Text(key.displayName).foregroundStyle(.secondary)
+                Spacer()
+                Text("no usage").font(.caption).foregroundStyle(.tertiary)
+            }
+        }
     }
 
     private var updatedText: String {
