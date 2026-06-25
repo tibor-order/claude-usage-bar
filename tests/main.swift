@@ -20,4 +20,8 @@ show("seven_day_sonnet", u.sevenDaySonnet)
 if let e = u.extraUsage {
     print("  extra_usage: enabled=\(e.isEnabled ?? false) used=\(e.usedCredits ?? 0)/\(e.monthlyLimit ?? 0) \(e.currency ?? "")")
 }
+if let s = u.spend {
+    func money(_ m: Money?) -> String { (m?.value).map { Money.format($0, currency: m?.currency) } ?? "nil" }
+    print("  spend: used=\(money(s.used)) limit=\(money(s.limit)) percent=\(s.percent.map { String($0) } ?? "nil") enabled=\(s.enabled ?? false) reason=\(s.disabledReason ?? "-")")
+}
 print("DECODE OK")

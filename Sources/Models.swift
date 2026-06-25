@@ -4,10 +4,16 @@ import Foundation
 struct Meter: Codable {
     let utilization: Double?
     let resetsAt: String?   // raw ISO-8601 string, or nil
+    let limitDollars: Double?       // null on most plans; set only for $-metered limits
+    let usedDollars: Double?
+    let remainingDollars: Double?
 
     enum CodingKeys: String, CodingKey {
         case utilization
         case resetsAt = "resets_at"
+        case limitDollars = "limit_dollars"
+        case usedDollars = "used_dollars"
+        case remainingDollars = "remaining_dollars"
     }
 
     var resetDate: Date? { Meter.parse(resetsAt) }
@@ -49,6 +55,7 @@ struct Usage: Codable {
     let sevenDayOpus: Meter?
     let sevenDaySonnet: Meter?
     let extraUsage: ExtraUsage?
+    let spend: Spend?
 
     enum CodingKeys: String, CodingKey {
         case fiveHour = "five_hour"
@@ -56,5 +63,47 @@ struct Usage: Codable {
         case sevenDayOpus = "seven_day_opus"
         case sevenDaySonnet = "seven_day_sonnet"
         case extraUsage = "extra_usage"
+        case spend
+    }
+}
+
+/// A money amount in minor units (e.g. cents). value = amount_minor / 10^exponent.
+struct Money: Codable {
+    let amountMinor: Double?
+    let currency: String?
+    let exponent: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case amountMinor = "amount_minor"
+        case currency
+        case exponent
+    }
+
+    var value: Double? {
+        guard let a = amountMinor else { return nil }
+        return a / pow(10.0, Double(exponent ?? 0))
+    }
+
+    static func format(_ v: Double, currency: String?) -> String {
+        let f = NumberFormatter()
+        f.numberStyle = .currency
+        f.currencyCode = currency ?? "USD"
+        return f.string(from: NSNumber(value: v)) ?? String(format: "%.2f", v)
+    }
+}
+
+/// Pay-as-you-go top-up ("usage credits"): real spent / cap amounts.
+struct Spend: Codable {
+    let used: Money?
+    let limit: Money?
+    let percent: Double?
+    let enabled: Bool?
+    let disabledReason: String?
+    let canPurchaseCredits: Bool?
+
+    enum CodingKeys: String, CodingKey {
+        case used, limit, percent, enabled
+        case disabledReason = "disabled_reason"
+        case canPurchaseCredits = "can_purchase_credits"
     }
 }

@@ -6,5 +6,6 @@
   "seven_day_sonnet": { "utilization": 0.0, "resets_at": null },
   "seven_day_cowork": null,
   "tangelo": null,
-  "extra_usage": { "is_enabled": false, "monthly_limit": 0, "used_credits": 0.0, "utilization": null, "currency": "USD", "disabled_reason": null }
+  "extra_usage": { "is_enabled": false, "monthly_limit": 0, "used_credits": 0.0, "utilization": null, "currency": "USD", "disabled_reason": null },
+  "spend": { "used": { "amount_minor": 1250, "currency": "EUR", "exponent": 2 }, "limit": { "amount_minor": 5000, "currency": "EUR", "exponent": 2 }, "percent": 25, "enabled": true, "disabled_reason": null, "can_purchase_credits": true }
 }

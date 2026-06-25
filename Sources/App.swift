@@ -88,8 +88,17 @@ struct PopoverView: View {
                         .font(.callout).foregroundStyle(.secondary)
                 }
                 ForEach(enabled) { meterRow($0) }       // a toggled-on meter ALWAYS shows
-                if sExtra, let extra = model.extraUsageText {
-                    Text(extra).font(.caption).foregroundStyle(.secondary)
+                if sExtra, let sp = model.spendInfo {
+                    VStack(alignment: .leading, spacing: 3) {
+                        HStack(spacing: 6) {
+                            Text("Extra credits")
+                            Spacer()
+                            Text("\(sp.used) / \(sp.limit)").monospacedDigit()
+                        }
+                        ProgressView(value: min(sp.percent, 100), total: 100).tint(tint(sp.percent))
+                        Text(sp.status.map { "\(sp.remaining) left · \($0)" } ?? "\(sp.remaining) left")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
                 }
             }
 

@@ -72,18 +72,29 @@ final class UsageModel: ObservableObject {
         return mostConstrained ?? rows.first   // chosen meter is null right now → graceful fallback
     }
 
-    /// Shown whenever an overflow allowance exists — including when it's off/exhausted,
-    /// since that status is itself useful. nil only when there's no extra-usage block at all.
-    var extraUsageText: String? {
-        guard let e = usage?.extraUsage, let limit = e.monthlyLimit, limit > 0 else { return nil }
-        let used = Int((e.usedCredits ?? 0).rounded())
-        let cur = e.currency ?? ""
-        var s = "Extra usage: \(used)/\(Int(limit)) \(cur)"
-        if let u = e.utilization { s += " · \(Int(u.rounded()))%" }
-        if e.isEnabled != true {
-            s += e.disabledReason == "out_of_credits" ? " · out of credits" : " · off"
-        }
-        return s
+    struct SpendInfo {
+        let used: String        // formatted money, e.g. "€43.36"
+        let limit: String       // topped-up cap, e.g. "€100.00"
+        let remaining: String   // limit − used
+        let percent: Double
+        let status: String?     // nil when active; "out of credits" / "off" otherwise
+    }
+
+    /// Real money values for pay-as-you-go top-up credits, from the API `spend` block.
+    var spendInfo: SpendInfo? {
+        guard let s = usage?.spend,
+              let usedV = s.used?.value,
+              let limitV = s.limit?.value, limitV > 0 else { return nil }
+        let cur = s.used?.currency ?? s.limit?.currency
+        let status: String? = (s.enabled == true) ? nil
+            : (s.disabledReason == "out_of_credits" ? "out of credits" : "off")
+        return SpendInfo(
+            used: Money.format(usedV, currency: cur),
+            limit: Money.format(limitV, currency: cur),
+            remaining: Money.format(max(0, limitV - usedV), currency: cur),
+            percent: s.percent ?? (usedV / limitV * 100),
+            status: status
+        )
     }
 
     static func dot(_ p: Double) -> String { p >= 80 ? "🔴" : (p >= 50 ? "🟡" : "🟢") }
