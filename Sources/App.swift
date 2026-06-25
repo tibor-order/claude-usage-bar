@@ -89,14 +89,21 @@ struct PopoverView: View {
                 }
                 ForEach(enabled) { meterRow($0) }       // a toggled-on meter ALWAYS shows
                 if sExtra, let sp = model.spendInfo {
+                    let outOfCredits = (sp.status == "out of credits")
                     VStack(alignment: .leading, spacing: 3) {
                         HStack(spacing: 6) {
                             Text("Extra credits")
                             Spacer()
-                            Text("\(sp.used) / \(sp.limit)").monospacedDigit()
+                            if let st = sp.status {
+                                Text(st).font(.caption).foregroundStyle(outOfCredits ? .red : .secondary)
+                            } else {
+                                Text("\(sp.used) / \(sp.limit)").monospacedDigit()
+                            }
                         }
-                        ProgressView(value: min(sp.percent, 100), total: 100).tint(tint(sp.percent))
-                        Text(sp.status.map { "\(sp.remaining) left · \($0)" } ?? "\(sp.remaining) left")
+                        ProgressView(value: min(sp.percent, 100), total: 100)
+                            .tint(outOfCredits ? .red : tint(sp.percent))
+                        // Only claim a positive balance when extra usage is actually active.
+                        Text(sp.status == nil ? "\(sp.remaining) left" : "\(sp.used) used · cap \(sp.limit)")
                             .font(.caption).foregroundStyle(.secondary)
                     }
                 }
